@@ -12,7 +12,7 @@ from monlam_ocr.utils import (
     unpatch_image,
     resize_image,
     unpatch_prediction,
-    rotate_page,
+    generate_line_images
 )
 
 
@@ -31,20 +31,21 @@ class LineDetection:
         self,
         config_file: str,
         binarize_output: bool = False,
-        dilate_kernel: int = 8,
-        dilate_iterations: int = 6,
-        execution_providers=None,
+        mode: str = "cpu",
     ) -> None:
         self._config_file = config_file
         self._onnx_model_file = None
         self._patch_size = 512
         self._binarize_output = binarize_output
-        self._dilate_kernel = dilate_kernel
-        self._dilate_iterations = dilate_iterations
         self._inference = None
         # add other Execution Providers if applicable, see: https://onnxruntime.ai/docs/execution-providers
-        if execution_providers is None:
+        self.mode = mode
+        
+        if self.mode == "cuda":
+            execution_providers = ["CUDAExecutionProvider"]
+        else:
             execution_providers = ["CPUExecutionProvider"]
+
         self.execution_providers = execution_providers
 
         self._init()
@@ -52,8 +53,14 @@ class LineDetection:
     def _init(self) -> None:
         _file = open(self._config_file)
         json_content = json.loads(_file.read())
-        self._onnx_model_file = json_content["model"]
+        
+        if self.mode == "cuda":
+            self._onnx_model_file = json_content["gpu-model"]
+        else:
+            self._onnx_model_file = json_content["cpu-model"]
+ 
         self._patch_size = json_content["patch_size"]
+
 
         if self._onnx_model_file is not None:
             try:
@@ -62,171 +69,12 @@ class LineDetection:
                 )
                 self.can_run = True
             except Exception as error:
-                logging.error(f"Error loading model file: {error}")
+                print.error(f"Error loading model file: {error}")
                 self.can_run = False
         else:
             self.can_run = False
 
-        logging.info(f"Line Inference -> Init(): {self.can_run}")
-
-    def get_lines(self, image: np.array, prediction: np.array):
-        line_contours, _ = cv2.findContours(
-            prediction, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
-        )
-
-        x, y, w, h = cv2.boundingRect(prediction)
-
-        if len(line_contours) == 0:
-            return [], None, None
-
-        elif len(line_contours) == 1:
-            bbox_center = (x + w // 2, y + h // 2)
-            peaks = [bbox_center]
-            sorted_contours = {bbox_center: line_contours[0]}
-            line_images = self.get_line_images(image, sorted_contours)
-
-            return line_images, sorted_contours, peaks
-        else:
-            sorted_contours, peaks = self.sort_lines(prediction, line_contours)
-            line_images = self.get_line_images(image, sorted_contours)
-
-            return line_images, sorted_contours, peaks
-
-    def sort_lines(self, line_prediction: np.array, contours: tuple):
-        """
-        A preliminary approach to sort the found contours and sort them by reading lines. The relative distance between the lines is currently taken as roughly constant,
-        wherefore mean // 2 is taken as threshold for line breaks. This might not work in scenarios in which the line distances are less constant.
-
-        Args:
-            - tuple of contours returned by cv2.findContours()
-        Returns:
-            - dictionary of {(bboxcenter_x, bbox_center_y) : [contour]}
-            - peaks returned by find_peaks() marking the line breaks
-        """
-
-        horizontal_projection = np.sum(line_prediction, axis=1)
-        horizontal_projection = horizontal_projection / 255
-        mean = int(np.mean(horizontal_projection))
-        peaks, _ = find_peaks(horizontal_projection, height=mean, width=4)
-
-        # calculate the line distances
-        line_distances = []
-        for idx in range(len(peaks)):
-            if idx < len(peaks) - 1:
-                line_distances.append(
-                    peaks[(len(peaks) - 1) - idx]
-                    - (peaks[(len(peaks) - 1) - (idx + 1)])
-                )
-
-        if len(line_distances) == 0:
-            line_distance = 0
-        else:
-            line_distance = int(
-                np.mean(line_distances)
-            )  # that might not work great if the line distances are varying a lot
-
-        # get the bbox centers of each contour and keep a reference to the contour in contour_dict
-        centers = []
-        contour_dict = {}
-
-        for contour in contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            y_center = y + (h // 2)
-            x_center = x + (w // 2)
-            centers.append((x_center, y_center))
-            contour_dict[(x_center, y_center)] = contour
-
-        centers = sorted(centers, key=lambda x: x[1])
-
-        # associate bbox centers with the peaks (i.e. line breaks)
-        cnt_dict = {}
-
-        for center in centers:
-            if center == centers[-1]:
-                cnt_dict[center[1]] = [center]
-                continue
-
-            for peak in peaks:
-                diff = abs(center[1] - peak)
-                if diff <= line_distance // 2:
-                    if peak in cnt_dict.keys():
-                        cnt_dict[peak].append(center)
-                    else:
-                        cnt_dict[peak] = [center]
-
-        # sort bbox centers for x value to get proper reading order
-        for k, v in cnt_dict.items():
-            if len(v) > 1:
-                v = sorted(v)
-                cnt_dict[k] = v
-
-        # build final dictionary with correctly sorted bbox_centers by y and x -> contour
-        sorted_contour_dict = {}
-        for k, v in cnt_dict.items():
-            for l in v:
-                sorted_contour_dict[l] = contour_dict[l]
-
-        return sorted_contour_dict, peaks
-
-    def get_line_images(self, image: np.array, sorted_line_contours: dict):
-        line_images = []
-
-        for _, v in sorted_line_contours.items():
-            image_mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
-            cv2.drawContours(
-                image_mask, [v], contourIdx=0, color=(255, 255, 255), thickness=-1
-            )
-            dilated1 = cv2.dilate(
-                image_mask,
-                kernel=(self._dilate_kernel, self._dilate_kernel),
-                iterations=self._dilate_iterations,
-                borderValue=0,
-                anchor=(-1, 0),
-                borderType=cv2.BORDER_DEFAULT,
-            )
-            dilated2 = cv2.dilate(
-                image_mask,
-                kernel=(self._dilate_kernel, self._dilate_kernel),
-                iterations=self._dilate_iterations,
-                borderValue=0,
-                anchor=(0, 1),
-                borderType=cv2.BORDER_DEFAULT,
-            )
-            combined = cv2.add(dilated1, dilated2)
-            image_masked = cv2.bitwise_and(image, image, mask=combined)
-
-            cropped_img = np.delete(
-                image_masked, np.where(~image_masked.any(axis=1))[0], axis=0
-            )
-            cropped_img = np.delete(
-                cropped_img, np.where(~cropped_img.any(axis=0))[0], axis=1
-            )
-
-            if self._binarize_output:
-                indices = np.where(cropped_img[:, :, 1] == 0)
-                clear = cropped_img.copy()
-                clear[indices[0], indices[1], :] = [255, 255, 255]
-                clear_bw = cv2.cvtColor(clear, cv2.COLOR_BGR2GRAY)
-                _, thresh = cv2.threshold(clear_bw, 170, 255, cv2.THRESH_BINARY)
-
-                line_images.append(thresh)
-            else:
-                line_images.append(cropped_img)
-
-        return line_images
-
-    def generate_line_images(self, image: np.array, prediction: np.array):
-        """
-        Applies some rotation correction to the original image and creates the line images based on the predicted lines.
-        """
-        rotated_img, rotated_prediction, angle = rotate_page(
-            original_image=image, line_mask=prediction
-        )
-        line_images, sorted_contours, peaks = self.get_lines(
-            rotated_img, rotated_prediction
-        )
-
-        return line_images, sorted_contours, peaks
+        print(f"Line Inference -> Init(): {self.can_run}")
 
     def predict(
         self,
@@ -244,10 +92,10 @@ class LineDetection:
         image_batch = np.transpose(image_batch, axes=[0, 3, 1, 2])  # make B x C x H xW
 
         ort_batch = ort.OrtValue.ortvalue_from_numpy(image_batch)
-        ocr_results = self._inference.run_with_ort_values(
+        prediction = self._inference.run_with_ort_values(
             ["output"], {"input": ort_batch}
         )
-        prediction = ocr_results[0].numpy()
+        prediction = prediction[0].numpy()
         prediction = np.squeeze(prediction, axis=1)
         prediction = expit(prediction)
         prediction = np.where(prediction > class_threshold, 1.0, 0.0)
@@ -267,7 +115,12 @@ class LineDetection:
         )
         back_sized_image = back_sized_image.astype(np.uint8)
 
-        line_images, sorted_contours, peaks = self.generate_line_images(
+        # TODO: remove this into a post-processing module
+        line_images, sorted_contours, bbox, peaks = generate_line_images(
             original_image, back_sized_image
         )
-        return back_sized_image, line_images, sorted_contours, peaks
+        return back_sized_image, line_images, sorted_contours, bbox, peaks
+    
+
+    def predict_batch(self, image_list: list[np.array]):
+        pass

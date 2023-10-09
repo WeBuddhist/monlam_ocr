@@ -1,4 +1,1 @@
-{
-  "model": "Models/LineModels/line_model_v1_q.onnx",
-  "patch_size": 512
-}
+{"cpu-model": "/home/whitetiger/esukhia/monlam_ocr/Models/LineModels/segmentation_model_cpu.onnx", "gpu-model": "Models/LineModels/segmentation_model_cuda.onnx", "patch_size": 512, "model": "/home/whitetiger/esukhia/monlam_ocr/Models/LineModels/segmentation_model_cpu.onnx"}
