@@ -1,9 +1,58 @@
 import json
+import logging
+import os
+import zipfile
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).parent.parent.parent
+import requests
+
+ROOT_DIR = Path(__file__).parent.parent
+PKG_DATA = Path.home() / ".monlam_ocr"
 MODELS_DIR_NAME = "Models"
-MODELS_PATH = ROOT_DIR / MODELS_DIR_NAME
+MODELS_PATH = PKG_DATA / MODELS_DIR_NAME
+MODELS_VERSION_TAG = os.environ.get("MODELS_VERSION_TAG", "v0.0.2")
+
+
+def download_models():
+    token = os.environ["GITHUB_TOKEN"]
+    asset_name = "Models.zip"
+
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    # 1. Get the list of releases
+    releases_url = "https://api.github.com/repos/OpenPecha/monlam_ocr/releases"
+    releases = requests.get(releases_url, headers=headers).json()
+
+    # Assuming the asset is in the latest release, find the asset ID
+    asset_id = None
+    for asset in releases[0]["assets"]:
+        if asset["name"] == asset_name:
+            asset_id = asset["id"]
+            break
+
+    if asset_id is None:
+        print("Asset not found!")
+        return
+
+    # 2. Download the asset using its ID
+    asset_url = (
+        f"https://api.github.com/repos/OpenPecha/monlam_ocr/releases/assets/{asset_id}"
+    )
+    response = requests.get(asset_url, headers=headers, stream=True)
+
+    with open(asset_name, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    with zipfile.ZipFile("Models.zip", "r") as zip_ref:
+        zip_ref.extractall(str(PKG_DATA))
+    os.remove("Models.zip")
+    logging.info(f"Models is saved at {MODELS_PATH}")
+
+    return MODELS_PATH
 
 
 def fix_models_path(path: str) -> str:
@@ -20,6 +69,8 @@ def fix_models_path(path: str) -> str:
 
 
 def get_models_path():
+    download_models()
+
     # setup line model path
     line_model_path = MODELS_PATH / "LineModels"
     line_model_config_path = line_model_path / "line_model_config.json"

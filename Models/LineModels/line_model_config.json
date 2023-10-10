@@ -1,1 +1,1 @@
-{"cpu-model": "/Users/10zinten/Developer/MonlamAI/ocr/monlam_ocr/Models/LineModels/segmentation_model_cpu.onnx", "gpu-model": "/Users/10zinten/Developer/MonlamAI/ocr/monlam_ocr/Models/LineModels/segmentation_model_cuda.onnx", "patch_size": 512, "model": "/Users/10zinten/Developer/MonlamAI/ocr/monlam_ocr/Models/LineModels/segmentation_model_cpu.onnx"}
+{"cpu-model": "Models/LineModels/segmentation_model_cpu.onnx", "gpu-model": "Models/LineModels/segmentation_model_cuda.onnx", "patch_size": 512, "model": "Models/LineModels/segmentation_model_cpu.onnx"}
