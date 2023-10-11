@@ -26,11 +26,19 @@ def download_models():
     releases_url = "https://api.github.com/repos/OpenPecha/monlam_ocr/releases"
     releases = requests.get(releases_url, headers=headers).json()
 
-    # Assuming the asset is in the latest release, find the asset ID
+    # find asset id from the specified release with tag
     asset_id = None
-    for asset in releases[0]["assets"]:
-        if asset["name"] == asset_name:
-            asset_id = asset["id"]
+    found_release = False
+    for release in releases:
+        if release["tag_name"] != MODELS_VERSION_TAG:
+            continue
+        for asset in release["assets"]:
+            if asset["name"] == asset_name:
+                asset_id = asset["id"]
+                found_release = True
+                break
+
+        if found_release:
             break
 
     if asset_id is None:
@@ -41,6 +49,7 @@ def download_models():
     asset_url = (
         f"https://api.github.com/repos/OpenPecha/monlam_ocr/releases/assets/{asset_id}"
     )
+    headers["Accept"] = "application/octet-stream"
     response = requests.get(asset_url, headers=headers, stream=True)
 
     with open(asset_name, "wb") as f:
