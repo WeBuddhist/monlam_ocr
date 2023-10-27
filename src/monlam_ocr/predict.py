@@ -10,12 +10,23 @@ Run e.g. python predict.py --input_dir "Data/W30125" --line_dilate 10 --line_ite
 
 import cv2
 
+from monlam_ocr.exceptions import FailedToLoadImage
 from monlam_ocr.line_detection import LineDetection
 from monlam_ocr.ocr import OCRInference
 
 
-def run_ocr(image_path: str, line_inference: LineDetection, ocr_inference: OCRInference ) -> None:
+def run_ocr(
+    image_path: str, line_inference: LineDetection, ocr_inference: OCRInference
+) -> None:
     image = cv2.imread(image_path)
-    back_sized_image, line_images, sorted_contours, bbox, peaks = line_inference.predict(image, 0)
+    if image is None:
+        FailedToLoadImage(f"Failed to load image from {image_path}")
+    (
+        back_sized_image,
+        line_images,
+        sorted_contours,
+        bbox,
+        peaks,
+    ) = line_inference.predict(image, 0)
     predicted_text, prediction = ocr_inference.run(line_images)
     return predicted_text
