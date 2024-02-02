@@ -258,6 +258,22 @@ def rotate_page(
     return rotated_img, rotated_prediction, mean_angle
 
 
+def binarize_line(img: np.array, adaptive: bool = True) -> np.array:
+    line_img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+    if adaptive:
+        bw = cv2.adaptiveThreshold(
+            line_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 13
+        )
+
+    else:
+        _, bw = cv2.threshold(line_img, 120, 255, cv2.THRESH_BINARY)
+
+    bw = cv2.cvtColor(bw, cv2.COLOR_GRAY2RGB)
+    return bw
+
+
+
 def get_line_images(
     image: np.array,
     sorted_line_contours: dict,
@@ -504,7 +520,7 @@ def optimize_countour(cnt, e=0.001):
 
 
 def prepare_ocr_image(
-    line_image: np.array, target_width: int = 2000, target_height: int = 80
+    line_image: np.array, target_width: int = 2000, target_height: int = 80, 
 ):
     if len(line_image.shape) > 2:
         line_image = cv2.cvtColor(line_image, cv2.COLOR_BGR2GRAY)
@@ -513,10 +529,11 @@ def prepare_ocr_image(
         line_image,
         target_width=target_width,
         target_height=target_height,
-        padding="white",
+        padding="black",
     )
     image = image.reshape((1, target_height, target_width))
-    image = (image / 127.5) - 1.0
+    #image = (image / 127.5) - 1.0
+    image = image / 255.0
     image = image.astype(np.float32)
     return image
 
