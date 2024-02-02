@@ -1,0 +1,12 @@
+{
+	"model": "DergeTenjur_easter2b.onnx",
+ 	 "input_width": 2000,
+  	"input_height": 80,
+  	"squeeze_channel_dim" : "yes",
+	"swap_hw": "yes",
+	"input_layer" : "images",
+	"output_layer": "Final",
+  	"charset": "!#%'`()+-./0123456789:=?@ADHIMNRSTUWXY[\\]_abcdefghijklmnoprstuwyz|~§&äüö<>;",
+	"normalization" : "simple",
+	"padding_color" : "black"
+ }

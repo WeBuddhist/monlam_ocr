@@ -520,7 +520,7 @@ def optimize_countour(cnt, e=0.001):
 
 
 def prepare_ocr_image(
-    line_image: np.array, target_width: int = 2000, target_height: int = 80, 
+    line_image: np.array, target_width: int = 2000, target_height: int = 80
 ):
     if len(line_image.shape) > 2:
         line_image = cv2.cvtColor(line_image, cv2.COLOR_BGR2GRAY)
@@ -529,11 +529,11 @@ def prepare_ocr_image(
         line_image,
         target_width=target_width,
         target_height=target_height,
-        padding="black",
+        padding="white",
     )
     image = image.reshape((1, target_height, target_width))
-    #image = (image / 127.5) - 1.0
-    image = image / 255.0
+    image = (image / 127.5) - 1.0
+    #image = image / 255.0
     image = image.astype(np.float32)
     return image
 

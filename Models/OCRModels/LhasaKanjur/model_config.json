@@ -1,0 +1,12 @@
+{
+	"model": "LhasaKanjur.onnx",
+	"input_width": 2000, 
+	"input_height": 80,
+	"squeeze_channel_dim" : "no",
+	"swap_hw": "no",
+	"input_layer": "input", 
+	"output_layer": "output", 
+	"charset": "!#%'()+-./0123456789:=?@ADHIMNRSTUWXY[\\]_abcdefghijklmnoprstuwyz|~&\u00e4\u00fc\u00f6<>;",
+	"normalization": "mean",
+	"padding_color" : "black"
+	}
