@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).parent.parent
 PKG_DATA = Path.home() / ".monlam_ocr"
 MODELS_DIR_NAME = "Models"
 MODELS_PATH = PKG_DATA / MODELS_DIR_NAME
-MODELS_VERSION_TAG = os.environ.get("MODELS_VERSION_TAG", "v0.0.2")
+MODELS_VERSION_TAG = os.environ.get("MODELS_VERSION_TAG", "v0.0.5")
 
 
 def download_models():
@@ -94,7 +94,7 @@ def get_models_path():
     json.dump(line_model_config, open(line_model_config_path, "w"))
 
     # setup ocr model path
-    ocr_model_path = MODELS_PATH / "OCRModels" / "LhasaKanjur"
+    ocr_model_path = MODELS_PATH / "OCRModels" / "DergeTenjur"
     ocr_model_config_path = ocr_model_path / "ocr_model_config.json"
     ocr_model_config = json.load(open(ocr_model_config_path))
     ocr_model_config["cpu-model"] = fix_models_path(ocr_model_config["cpu-model"])
