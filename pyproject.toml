@@ -30,6 +30,7 @@ dependencies = [
     "pyewts==0.2.0",
     "scipy==1.10.1",
     "tqdm==4.66.1",
+    "requests==2.31.0"
 ]
 
 [project.optional-dependencies]
