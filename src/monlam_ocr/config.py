@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).parent.parent
 PKG_DATA = Path.home() / ".monlam_ocr"
 MODELS_DIR_NAME = "Models"
 MODELS_PATH = PKG_DATA / MODELS_DIR_NAME
-MODELS_VERSION_TAG = os.environ.get("MODELS_VERSION_TAG", "v0.0.5")
+MODELS_VERSION_TAG = os.environ.get("MODELS_VERSION_TAG", "v0.0.7")
 
 
 def download_models():
