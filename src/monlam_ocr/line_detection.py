@@ -1,5 +1,6 @@
 import cv2
 import json
+import os
 import logging
 import numpy as np
 import onnxruntime as ort
@@ -51,13 +52,15 @@ class LineDetection:
         self._init()
 
     def _init(self) -> None:
-        _file = open(self._config_file)
+        model_dir = os.path.dirname(self._config_file)
+
+        _file = open(self._config_file, encoding="utf-8")
         json_content = json.loads(_file.read())
         
         if self.mode == "cuda":
-            self._onnx_model_file = json_content["gpu-model"]
+            self._onnx_model_file = f"{model_dir}/{json_content['gpu-model']}"
         else:
-            self._onnx_model_file = json_content["cpu-model"]
+            self._onnx_model_file = f"{model_dir}/{json_content['cpu-model']}"
  
         self._patch_size = json_content["patch_size"]
 
@@ -96,6 +99,7 @@ class LineDetection:
             ["output"], {"input": ort_batch}
         )
         prediction = prediction[0].numpy()
+        print(f"this is{prediction.shape}")
         prediction = np.squeeze(prediction, axis=1)
         prediction = expit(prediction)
         prediction = np.where(prediction > class_threshold, 1.0, 0.0)
