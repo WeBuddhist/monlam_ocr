@@ -66,7 +66,7 @@ def download_models():
 
 
 def get_models_path():
-    # download_models()
+    download_models()
 
     # setup line model path
     line_model_path = MODELS_PATH / "LineModels"
