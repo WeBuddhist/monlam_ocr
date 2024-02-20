@@ -1,3 +1,4 @@
+import os
 import json
 import pyewts
 import numpy as np
@@ -9,42 +10,42 @@ from monlam_ocr.utils import prepare_ocr_image
 converter = pyewts.pyewts()
 
 class OCRInference:
-    def __init__(self, config_file, mode: str = "cpu") -> None:
+    def __init__(self, config_file) -> None:
         self.config = config_file
         self._onnx_model_file = None
         self._input_width = 2000
         self._input_height = 80
         self._characters = []
-        self._can_run = False
         self.ocr_session = None
-        self.mode = mode
+        self.execution_providers = ["CPUExecutionProvider", "CUDAExecutionProvider"]
         self._init()
 
     def _init(self) -> None:
+        model_dir = os.path.dirname(self.config)
+
         _file = open(self.config, encoding="utf-8")
         json_content = json.loads(_file.read())
-
-        if self.mode == "cuda":
-            self._onnx_model_file = json_content["gpu-model"]
-        else:
-            self._onnx_model_file = json_content["cpu-model"]
+        self._onnx_model_file = f"{model_dir}/{json_content['model']}"
 
         self._input_width = json_content["input_width"]
         self._input_height = json_content["input_height"]
         self._input_layer = json_content["input_layer"]
         self._output_layer = json_content["output_layer"]
-        self._add_channel_dim = json_content["add_channel_dim"]
-        self.charset = json_content["charset"]
+        self._squeeze_channel_dim = True if json_content["squeeze_channel_dim"] == "yes" else False
+        self._swap_hw = True if json_content["swap_hw"] == "yes" else False
+        self._characters = self.get_charset(json_content["charset"])
+        print(len(self._characters))
 
-        if self.mode == "cuda":
-            execution_providers = ["CUDAExecutionProvider"]
-        else:
-            execution_providers = ["CPUExecutionProvider"]
         self.ocr_session = ort.InferenceSession(
-            self._onnx_model_file, providers=execution_providers
+            self._onnx_model_file, providers=self.execution_providers
         )
 
-    def run(self, line_images: list, replace_blank: str = ""):
+    def get_charset(self, charset: str) -> str:
+        return f"ß{charset} "
+    
+    
+    def run(self, line_images: list, replace_tsheg: str = " "):
+
         img_batch = [
             prepare_ocr_image(
                 x, target_width=self._input_width, target_height=self._input_height
@@ -53,21 +54,31 @@ class OCRInference:
         ]
         img_batch = np.array(img_batch)
 
+        if self._squeeze_channel_dim:
+            img_batch = np.squeeze(img_batch, axis=1)
+
+        if self._swap_hw:
+            img_batch = np.transpose(img_batch, axes=[0, 2, 1])
+        print(img_batch.shape)
         ort_batch = ort.OrtValue.ortvalue_from_numpy(img_batch)
         ocr_results = self.ocr_session.run_with_ort_values(
             [self._output_layer], {self._input_layer: ort_batch}
         )
         prediction = ocr_results[0].numpy()
-        prediction = np.transpose(prediction, axes=[1, 0, 2])
-        # print(f"Raw prediction: {prediction.shape}")
+
+        if not self._swap_hw:
+            prediction = np.transpose(prediction, axes=[1, 0, 2])
 
         predicted_text = []
+        
         for idx in range(prediction.shape[0]):
             pred_line = prediction[idx, :, :]
-            text, _ = viterbi_search(pred_line, self.charset)
-            bo_text = converter.toUnicode(text)
+            text, _ = viterbi_search(pred_line, self._characters)
 
             if len(text) > 0:
+                text = text.replace(" ", "")
+                text = text.replace("§", replace_tsheg)
+                bo_text = converter.toUnicode(text)
                 predicted_text.append(bo_text)
             else:
                 predicted_text.append("")
