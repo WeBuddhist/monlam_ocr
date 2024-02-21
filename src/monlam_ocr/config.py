@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import zipfile
@@ -14,6 +13,12 @@ MODELS_VERSION_TAG = os.environ.get("MODELS_VERSION_TAG", "v0.0.7")
 
 
 def download_models():
+    if MODELS_PATH.exists():
+        logging.info(f"Models already exists at {MODELS_PATH}")
+        return MODELS_PATH
+
+    logging.info(f"Downloading models version {MODELS_VERSION_TAG}")
+
     token = os.environ["GITHUB_TOKEN"]
     asset_name = "Models.zip"
 
@@ -62,7 +67,6 @@ def download_models():
     logging.info(f"Models is saved at {MODELS_PATH}")
 
     return MODELS_PATH
-
 
 
 def get_models_path():

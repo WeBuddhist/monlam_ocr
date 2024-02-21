@@ -1,19 +1,19 @@
-import cv2
 import json
 import os
-import logging
+
+import cv2
 import numpy as np
 import onnxruntime as ort
 from scipy.special import expit
-from scipy.signal import find_peaks
-from fast_ctc_decode import viterbi_search
+
+from monlam_ocr.exceptions import FailedToLoadModel
 from monlam_ocr.utils import (
+    generate_line_images,
     pad_image,
     patch_image,
-    unpatch_image,
     resize_image,
+    unpatch_image,
     unpatch_prediction,
-    generate_line_images
 )
 
 
@@ -41,7 +41,7 @@ class LineDetection:
         self._inference = None
         # add other Execution Providers if applicable, see: https://onnxruntime.ai/docs/execution-providers
         self.mode = mode
-        
+
         if self.mode == "cuda":
             execution_providers = ["CUDAExecutionProvider"]
         else:
@@ -56,14 +56,13 @@ class LineDetection:
 
         _file = open(self._config_file, encoding="utf-8")
         json_content = json.loads(_file.read())
-        
+
         if self.mode == "cuda":
             self._onnx_model_file = f"{model_dir}/{json_content['gpu-model']}"
         else:
             self._onnx_model_file = f"{model_dir}/{json_content['cpu-model']}"
- 
-        self._patch_size = json_content["patch_size"]
 
+        self._patch_size = json_content["patch_size"]
 
         if self._onnx_model_file is not None:
             try:
@@ -72,7 +71,7 @@ class LineDetection:
                 )
                 self.can_run = True
             except Exception as error:
-                print.error(f"Error loading model file: {error}")
+                raise FailedToLoadModel(f"Failed to load model file: {error}")
                 self.can_run = False
         else:
             self.can_run = False
@@ -99,7 +98,6 @@ class LineDetection:
             ["output"], {"input": ort_batch}
         )
         prediction = prediction[0].numpy()
-        print(f"this is{prediction.shape}")
         prediction = np.squeeze(prediction, axis=1)
         prediction = expit(prediction)
         prediction = np.where(prediction > class_threshold, 1.0, 0.0)
@@ -113,7 +111,6 @@ class LineDetection:
         cropped_image = unpatched_image[
             : unpatched_image.shape[0] - pad_y, : unpatched_image.shape[1] - pad_x
         ]
-        # back_sized = cv2.resize(cropped_image, (int(cropped_image.shape[1] / resize_factor), int(cropped_image.shape[0] / resize_factor)))
         back_sized_image = cv2.resize(
             cropped_image, (original_image.shape[1], original_image.shape[0])
         )
@@ -124,7 +121,6 @@ class LineDetection:
             original_image, back_sized_image
         )
         return back_sized_image, line_images, sorted_contours, bbox, peaks
-    
 
     def predict_batch(self, image_list: list[np.array]):
         pass
