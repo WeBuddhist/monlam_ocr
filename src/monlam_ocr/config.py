@@ -70,14 +70,14 @@ def download_models():
 
 
 def get_models_path():
-    download_models()
+    models_path = download_models()
 
     # setup line model path
-    line_model_path = MODELS_PATH / "LineModels"
+    line_model_path = models_path / "LineModels"
     line_model_config_path = line_model_path / "line_model_config.json"
 
     # setup ocr model path
-    ocr_model_path = MODELS_PATH / "OCRModels" / "DergeTenjur"
+    ocr_model_path = models_path / "OCRModels" / "DergeTenjur"
     ocr_model_config_path = ocr_model_path / "ocr_model_config.json"
 
     return line_model_config_path, ocr_model_config_path

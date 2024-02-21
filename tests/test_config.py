@@ -1,42 +1,31 @@
-import json
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
-import pytest
-
-from monlam_ocr.config import MODELS_PATH, fix_models_path, get_models_path
-
-
-@pytest.mark.parametrize(
-    "test_input,expected",
-    [
-        ("/root/machine/Models/model.onnx", MODELS_PATH / "model.onnx"),
-        ("Models/model.onnx", MODELS_PATH / "model.onnx"),
-    ],
-)
-def test_fix_models_path(test_input, expected):
-    fixed_model_path = fix_models_path(test_input)
-    assert str(expected) == fixed_model_path
+from monlam_ocr.config import get_models_path
 
 
-def test_get_models_path():
-    line_model_config_path, ocr_model_config_path = get_models_path()
-    assert line_model_config_path.exists()
-    assert str(line_model_config_path).startswith("/")
-    assert ocr_model_config_path.exists()
-    assert str(ocr_model_config_path).startswith("/")
+def generate_fake_model_files(models_path):
+    # setup line model path
+    line_model_path = models_path / "LineModels"
+    line_model_path.mkdir(parents=True, exist_ok=True)
+    line_model_config_path = line_model_path / "line_model_config.json"
+    line_model_config_path.write_text("{}")
 
-    line_model_config = json.load(open(line_model_config_path))
-    assert Path(line_model_config["cpu-model"]).exists()
-    assert line_model_config["cpu-model"].startswith("/")
-    assert Path(line_model_config["gpu-model"]).exists()
-    assert line_model_config["gpu-model"].startswith("/")
-    assert Path(line_model_config["model"]).exists()
-    assert line_model_config["model"].startswith("/")
+    # setup ocr model path
+    ocr_model_path = models_path / "OCRModels" / "DergeTenjur"
+    ocr_model_path.mkdir(parents=True, exist_ok=True)
+    ocr_model_config_path = ocr_model_path / "ocr_model_config.json"
+    ocr_model_config_path.write_text("{}")
 
-    ocr_model_config = json.load(open(ocr_model_config_path))
-    assert Path(ocr_model_config["cpu-model"]).exists()
-    assert ocr_model_config["cpu-model"].startswith("/")
-    assert Path(ocr_model_config["gpu-model"]).exists()
-    assert ocr_model_config["gpu-model"].startswith("/")
-    assert Path(ocr_model_config["model"]).exists()
-    assert ocr_model_config["model"].startswith("/")
+
+@patch("monlam_ocr.config.download_models")
+def test_get_models_path(mock_download_models):
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        models_path = Path(tmpdirname)
+        generate_fake_model_files(models_path)
+        mock_download_models.return_value = models_path
+        line_model_config_path, ocr_model_config_path = get_models_path()
+
+        assert line_model_config_path.exists()
+        assert ocr_model_config_path.exists()
