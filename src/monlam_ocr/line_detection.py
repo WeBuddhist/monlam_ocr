@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 import cv2
@@ -76,7 +77,7 @@ class LineDetection:
         else:
             self.can_run = False
 
-        print(f"Line Inference -> Init(): {self.can_run}")
+        logging.debug(f"Line Inference -> Init(): {self.can_run}")
 
     def predict(
         self,

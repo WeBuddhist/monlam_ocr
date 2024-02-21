@@ -5,6 +5,8 @@ from pathlib import Path
 
 import requests
 
+from monlam_ocr.exceptions import FailedToDownloadModel
+
 ROOT_DIR = Path(__file__).parent.parent
 PKG_DATA = Path.home() / ".monlam_ocr"
 MODELS_DIR_NAME = "Models"
@@ -70,7 +72,10 @@ def download_models():
 
 
 def get_models_path():
-    models_path = download_models()
+    try:
+        models_path = download_models()
+    except Exception as e:
+        raise FailedToDownloadModel(f"Failed to download models: {e}")
 
     # setup line model path
     line_model_path = models_path / "LineModels"
